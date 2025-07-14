@@ -1,90 +1,180 @@
 --[[ 
-🌟 Fruit ESP GUI - Universal Version
-🎮 Highlights fruits in the game
-🔑 Press G to show/hide GUI
+📜 Universal Old Server Finder (v1.0)
+✅ Works in ANY Roblox game
+✅ Filters servers with older placeVersion
+✅ Toggle GUI with G
+✅ Minimize with "-"
 ]]
 
--- Services
+-- 🔧 Services
 local Players = game:GetService("Players")
+local HttpService = game:GetService("HttpService")
+local TeleportService = game:GetService("TeleportService")
 local UIS = game:GetService("UserInputService")
-local RunService = game:GetService("RunService")
-local LocalPlayer = Players.LocalPlayer
+local Chat = game:GetService("StarterGui")
 
--- Cleanup any old UI
+-- 📌 Game info
+local Player = Players.LocalPlayer
+local placeId = game.PlaceId
+local currentVersion = game.PlaceVersion
+
+-- 💬 Log helper
+local function log(msg)
+    Chat:SetCore("ChatMakeSystemMessage", {
+        Text = "[OldFinder] " .. msg,
+        Color = Color3.fromRGB(0, 255, 0)
+    })
+end
+
+log("Universal Mode: PlaceID = "..placeId..", Version = "..currentVersion)
+
+-- 🧹 Cleanup
 pcall(function()
-    LocalPlayer.PlayerGui:FindFirstChild("FruitESP_UI"):Destroy()
+    Player.PlayerGui:FindFirstChild("OldServerUI"):Destroy()
 end)
 
 -- GUI Setup
-local gui = Instance.new("ScreenGui", LocalPlayer:WaitForChild("PlayerGui"))
-gui.Name = "FruitESP_UI"
+local gui = Instance.new("ScreenGui", Player.PlayerGui)
+gui.Name = "OldServerUI"
 gui.ResetOnSpawn = false
 
 local frame = Instance.new("Frame", gui)
-frame.Size = UDim2.new(0, 300, 0, 100)
-frame.Position = UDim2.new(0.5, -150, 0.05, 0)
+frame.Size = UDim2.new(0, 400, 0, 420)
+frame.Position = UDim2.new(0.5, -200, 0.5, -210)
 frame.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
-frame.BorderSizePixel = 0
 frame.Active = true
 frame.Draggable = true
 
 local title = Instance.new("TextLabel", frame)
-title.Size = UDim2.new(1, 0, 0, 30)
-title.Text = "🍎 Fruit ESP Activated"
+title.Size = UDim2.new(1, -40, 0, 40)
+title.Position = UDim2.new(0, 10, 0, 0)
+title.Text = "🔍 Old Server Finder (v" .. tostring(currentVersion) .. ")"
+title.TextColor3 = Color3.new(1,1,1)
 title.BackgroundTransparency = 1
 title.Font = Enum.Font.GothamBold
-title.TextColor3 = Color3.new(1,1,1)
 title.TextSize = 18
+title.TextXAlignment = Enum.TextXAlignment.Left
 
-local status = Instance.new("TextLabel", frame)
-status.Position = UDim2.new(0, 0, 0, 35)
-status.Size = UDim2.new(1, 0, 1, -35)
-status.Text = "Fruits will be highlighted if found."
-status.Font = Enum.Font.Gotham
-status.TextColor3 = Color3.new(0.8, 1, 0.8)
-status.BackgroundTransparency = 1
-status.TextSize = 14
+local minimize = Instance.new("TextButton", frame)
+minimize.Size = UDim2.new(0, 30, 0, 30)
+minimize.Position = UDim2.new(1, -35, 0, 5)
+minimize.Text = "-"
+minimize.Font = Enum.Font.GothamBold
+minimize.TextSize = 22
+minimize.BackgroundColor3 = Color3.fromRGB(60,60,60)
+minimize.TextColor3 = Color3.new(1,1,1)
 
--- G toggle
-UIS.InputBegan:Connect(function(input, gameProcessed)
-    if not gameProcessed and input.KeyCode == Enum.KeyCode.G then
+local content = Instance.new("Frame", frame)
+content.Position = UDim2.new(0, 10, 0, 45)
+content.Size = UDim2.new(1, -20, 1, -55)
+content.BackgroundTransparency = 1
+
+local layout = Instance.new("UIListLayout", content)
+layout.Padding = UDim.new(0, 5)
+
+local fetchBtn = Instance.new("TextButton", content)
+fetchBtn.Size = UDim2.new(1, 0, 0, 40)
+fetchBtn.BackgroundColor3 = Color3.fromRGB(50,150,50)
+fetchBtn.TextColor3 = Color3.new(1,1,1)
+fetchBtn.Text = "🔍 Show Old Servers (v < " .. tostring(currentVersion) .. ")"
+fetchBtn.Font = Enum.Font.GothamBold
+fetchBtn.TextSize = 16
+
+-- FETCH OLD SERVERS
+local function fetchServers()
+    for _, c in ipairs(content:GetChildren()) do
+        if c:IsA("TextButton") and c ~= fetchBtn then
+            c:Destroy()
+        end
+    end
+
+    fetchBtn.Text = "Loading..."
+    log("Fetching servers for PlaceID: " .. placeId)
+
+    local ok, raw = pcall(function()
+        return game:HttpGet("https://games.roblox.com/v1/games/"..placeId.."/servers/Public?sortOrder=Asc&limit=100")
+    end)
+
+    if not ok or not raw then
+        fetchBtn.Text = "❌ Failed. Retry"
+        log("❌ Fetch failed. Retrying in 5s...")
+        task.delay(5, fetchServers)
+        return
+    end
+
+    local data
+    local success = pcall(function()
+        data = HttpService:JSONDecode(raw)
+    end)
+
+    if not success or not data or not data.data then
+        fetchBtn.Text = "❌ Invalid data"
+        log("⚠️ Invalid response. Retrying in 5s...")
+        task.delay(5, fetchServers)
+        return
+    end
+
+    local servers = {}
+    for _, s in pairs(data.data) do
+        if s.playing < s.maxPlayers and s.version and s.version < currentVersion then
+            table.insert(servers, s)
+        end
+    end
+
+    table.sort(servers, function(a, b)
+        return a.version < b.version
+    end)
+
+    if #servers == 0 then
+        fetchBtn.Text = "No old servers found"
+        log("✅ No outdated servers available.")
+        return
+    end
+
+    for i = 1, math.min(5, #servers) do
+        local s = servers[i]
+        local age = tick() - DateTime.fromIsoDate(s.created):ToUnixTimestamp()
+        local ageText = age >= 3600 and string.format("%.1f hr", age/3600) or (math.floor(age/60) .. " min")
+        local btn = Instance.new("TextButton", content)
+        btn.Size = UDim2.new(1, 0, 0, 35)
+        btn.BackgroundColor3 = Color3.fromRGB(40,40,40)
+        btn.TextColor3 = Color3.new(1,1,1)
+        btn.Font = Enum.Font.Gotham
+        btn.TextSize = 14
+        btn.Text = string.format("🕒 %s old | v%d | %d/%d", ageText, s.version, s.playing, s.maxPlayers)
+        btn.MouseButton1Click:Connect(function()
+            TeleportService:TeleportToPlaceInstance(placeId, s.id, Player)
+        end)
+    end
+
+    local refresh = Instance.new("TextButton", content)
+    refresh.Size = UDim2.new(1, 0, 0, 35)
+    refresh.BackgroundColor3 = Color3.fromRGB(80,80,80)
+    refresh.TextColor3 = Color3.new(1,1,1)
+    refresh.Font = Enum.Font.Gotham
+    refresh.TextSize = 14
+    refresh.Text = "🔁 Refresh"
+    refresh.MouseButton1Click:Connect(fetchServers)
+
+    fetchBtn.Text = "🔍 Show Old Servers"
+    log("✅ Found " .. #servers .. " old server(s).")
+end
+
+-- Connect button
+fetchBtn.MouseButton1Click:Connect(fetchServers)
+
+-- G key to toggle
+UIS.InputBegan:Connect(function(input, gp)
+    if not gp and input.KeyCode == Enum.KeyCode.G then
         gui.Enabled = not gui.Enabled
+        log("Toggled GUI: " .. tostring(gui.Enabled))
     end
 end)
 
--- ESP Setup
-local espFolder = Instance.new("Folder", game.CoreGui)
-espFolder.Name = "FruitESP_Folder"
-
-local function createESP(part, labelText)
-    local billboard = Instance.new("BillboardGui", espFolder)
-    billboard.Name = "FruitESP"
-    billboard.Adornee = part
-    billboard.Size = UDim2.new(0, 100, 0, 30)
-    billboard.AlwaysOnTop = true
-
-    local label = Instance.new("TextLabel", billboard)
-    label.Size = UDim2.new(1, 0, 1, 0)
-    label.Text = "🍎 " .. labelText
-    label.BackgroundTransparency = 1
-    label.TextColor3 = Color3.fromRGB(255, 100, 100)
-    label.Font = Enum.Font.GothamBold
-    label.TextSize = 14
-end
-
--- Auto-scan for fruit parts
-local function scanForFruits()
-    for _, obj in pairs(workspace:GetDescendants()) do
-        if obj:IsA("BasePart") and obj.Name:lower():match("fruit") then
-            if not espFolder:FindFirstChild(obj:GetFullName()) then
-                createESP(obj, obj.Name)
-            end
-        end
-    end
-end
-
--- Scan every 5 seconds
-while true do
-    pcall(scanForFruits)
-    wait(5)
-end
+-- Minimize
+local hidden = false
+minimize.MouseButton1Click:Connect(function()
+    hidden = not hidden
+    content.Visible = not hidden
+    log(hidden and "Minimized." or "Restored.")
+end)

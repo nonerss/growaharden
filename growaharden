@@ -1,0 +1,143 @@
+local customPlaceId = 14537007450
+
+-- SERVICES
+local Players = game:GetService("Players")
+local HttpService = game:GetService("HttpService")
+local TeleportService = game:GetService("TeleportService")
+local UIS = game:GetService("UserInputService")
+local Player = Players.LocalPlayer
+repeat wait() until Player:FindFirstChild("PlayerGui")
+
+-- CLEANUP OLD UI
+pcall(function()
+    Player.PlayerGui:FindFirstChild("OldServerUI"):Destroy()
+end)
+
+-- GUI
+local gui = Instance.new("ScreenGui", Player.PlayerGui)
+gui.Name = "OldServerUI"
+gui.ResetOnSpawn = false
+
+local frame = Instance.new("Frame", gui)
+frame.Size = UDim2.new(0, 400, 0, 400)
+frame.Position = UDim2.new(0.5, -200, 0.5, -200)
+frame.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
+frame.Active = true
+frame.Draggable = true
+
+local title = Instance.new("TextLabel", frame)
+title.Size = UDim2.new(1, -40, 0, 40)
+title.Position = UDim2.new(0, 10, 0, 0)
+title.Text = "🌱 Grow a Garden - Old Server Finder"
+title.TextColor3 = Color3.new(1,1,1)
+title.BackgroundTransparency = 1
+title.Font = Enum.Font.GothamBold
+title.TextSize = 18
+title.TextXAlignment = Enum.TextXAlignment.Left
+
+-- Minimize Button
+local minimize = Instance.new("TextButton", frame)
+minimize.Size = UDim2.new(0, 30, 0, 30)
+minimize.Position = UDim2.new(1, -35, 0, 5)
+minimize.Text = "-"
+minimize.Font = Enum.Font.GothamBold
+minimize.TextSize = 22
+minimize.BackgroundColor3 = Color3.fromRGB(60,60,60)
+minimize.TextColor3 = Color3.new(1,1,1)
+
+local contentHolder = Instance.new("Frame", frame)
+contentHolder.Position = UDim2.new(0, 10, 0, 45)
+contentHolder.Size = UDim2.new(1, -20, 1, -55)
+contentHolder.BackgroundTransparency = 1
+
+local layout = Instance.new("UIListLayout", contentHolder)
+layout.Padding = UDim.new(0, 5)
+
+-- Fetch Button
+local showBtn = Instance.new("TextButton", contentHolder)
+showBtn.Size = UDim2.new(1, 0, 0, 40)
+showBtn.BackgroundColor3 = Color3.fromRGB(50,150,50)
+showBtn.TextColor3 = Color3.new(1,1,1)
+showBtn.Text = "🔍 Show Old Servers"
+showBtn.Font = Enum.Font.GothamBold
+showBtn.TextSize = 16
+
+-- SERVER FETCH FUNCTION
+local function fetchServers()
+    -- Remove old entries
+    for _, child in pairs(contentHolder:GetChildren()) do
+        if child:IsA("TextButton") and child ~= showBtn then
+            child:Destroy()
+        end
+    end
+
+    showBtn.Text = "Loading..."
+
+    local ok, data = pcall(function()
+        return HttpService:JSONDecode(game:HttpGet(
+            ("https://games.roblox.com/v1/games/%s/servers/Public?sortOrder=Asc&limit=100"):format(customPlaceId)
+        ))
+    end)
+
+    if not ok or not data or not data.data then
+        showBtn.Text = "❌ Failed. Retry"
+        return
+    end
+
+    local servers = {}
+    for _, s in pairs(data.data) do
+        if s.playing < s.maxPlayers then
+            table.insert(servers, s)
+        end
+    end
+
+    table.sort(servers, function(a, b)
+        return a.created < b.created
+    end)
+
+    -- Show Top 5
+    for i = 1, math.min(5, #servers) do
+        local s = servers[i]
+        local age = math.floor((tick() - DateTime.fromIsoDate(s.created):ToUnixTimestamp()) / 60)
+        local ageTxt = age >= 60 and string.format("%.1f hr", age/60) or (age .. " min")
+
+        local btn = Instance.new("TextButton", contentHolder)
+        btn.Size = UDim2.new(1, 0, 0, 35)
+        btn.BackgroundColor3 = Color3.fromRGB(40,40,40)
+        btn.TextColor3 = Color3.new(1,1,1)
+        btn.Font = Enum.Font.Gotham
+        btn.TextSize = 14
+        btn.Text = string.format("🕒 %s | %d/%d Players", ageTxt, s.playing, s.maxPlayers)
+        btn.MouseButton1Click:Connect(function()
+            TeleportService:TeleportToPlaceInstance(customPlaceId, s.id, Player)
+        end)
+    end
+
+    -- Refresh
+    local refresh = Instance.new("TextButton", contentHolder)
+    refresh.Size = UDim2.new(1, 0, 0, 35)
+    refresh.BackgroundColor3 = Color3.fromRGB(80,80,80)
+    refresh.TextColor3 = Color3.new(1,1,1)
+    refresh.Font = Enum.Font.Gotham
+    refresh.TextSize = 14
+    refresh.Text = "🔁 Refresh"
+    refresh.MouseButton1Click:Connect(fetchServers)
+
+    showBtn.Text = "🔍 Show Old Servers"
+end
+
+showBtn.MouseButton1Click:Connect(fetchServers)
+
+-- G KEY TO TOGGLE GUI
+UIS.InputBegan:Connect(function(input, gameProcessed)
+    if not gameProcessed and input.KeyCode == Enum.KeyCode.G then
+        gui.Enabled = not gui.Enabled
+    end
+end)
+
+-- Minimize Toggle
+local minimized = false
+minimize.MouseButton1Click:Connect(function()
+    minimized = not minimized
+    contentHolder.Visible = not minimized
+end)

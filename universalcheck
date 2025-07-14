@@ -1,0 +1,56 @@
+--[[ 
+📝 UNIVERSAL OBJECT LOGGER + FILE WRITER
+Scans all workspace objects and saves details to "FruitData.txt"
+]]
+
+local output = {}
+local function log(text)
+    table.insert(output, text)
+end
+
+local function logAttributes(obj)
+    local attributes = obj:GetAttributes()
+    if next(attributes) then
+        log("  🔶 Attributes:")
+        for key, value in pairs(attributes) do
+            log("    - " .. key .. " = " .. tostring(value))
+        end
+    end
+end
+
+local function logChildren(obj)
+    local logged = false
+    for _, child in ipairs(obj:GetChildren()) do
+        if child:IsA("NumberValue") or child:IsA("StringValue") or child:IsA("BoolValue") then
+            if not logged then
+                log("  🔷 Child Values:")
+                logged = true
+            end
+            log("    - " .. child.Name .. " = " .. tostring(child.Value))
+        end
+    end
+end
+
+log("📦 Scanning all workspace objects...\n")
+
+for _, obj in ipairs(workspace:GetDescendants()) do
+    if obj:IsA("BasePart") or obj:IsA("Model") then
+        log("🧩 Found: " .. obj:GetFullName() .. " | Type: " .. obj.ClassName)
+        logAttributes(obj)
+        logChildren(obj)
+        log("") -- newline for spacing
+    end
+end
+
+log("✅ Done scanning. File saved as FruitData.txt")
+
+-- 📝 Save to file
+local success, err = pcall(function()
+    writefile("FruitData.txt", table.concat(output, "\n"))
+end)
+
+if success then
+    warn("✅ FruitData.txt saved to your executor folder.")
+else
+    warn("❌ writefile() failed. Is your executor missing permission?")
+end

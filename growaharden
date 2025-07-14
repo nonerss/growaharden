@@ -1,11 +1,10 @@
 --[[ 
-📜 Grow a Garden Old Server Finder v1.4
-🧠 New logic: filter by placeVersion (old servers have lower version)
-🎮 Use with KRNL in Grow a Garden session
+📜 Universal Old Server Finder (v1.0)
+✅ Works in ANY Roblox game
+✅ Filters servers with older placeVersion
+✅ Toggle GUI with G
+✅ Minimize with "-"
 ]]
-
--- ✅ Real game place ID
-local customPlaceId = 14537007450
 
 -- 🔧 Services
 local Players = game:GetService("Players")
@@ -14,11 +13,9 @@ local TeleportService = game:GetService("TeleportService")
 local UIS = game:GetService("UserInputService")
 local Chat = game:GetService("StarterGui")
 
--- 📌 Wait for PlayerGui
+-- 📌 Game info
 local Player = Players.LocalPlayer
-repeat wait() until Player and Player:FindFirstChild("PlayerGui")
-
--- 📋 Current server version
+local placeId = game.PlaceId
 local currentVersion = game.PlaceVersion
 
 -- 💬 Log helper
@@ -29,14 +26,14 @@ local function log(msg)
     })
 end
 
-log("Current server version: " .. tostring(currentVersion))
+log("Universal Mode: PlaceID = "..placeId..", Version = "..currentVersion)
 
--- 🧹 Remove previous GUI if exists
+-- 🧹 Cleanup
 pcall(function()
-    Player.PlayerGui.OldServerUI:Destroy()
+    Player.PlayerGui:FindFirstChild("OldServerUI"):Destroy()
 end)
 
--- 🎨 GUI Setup
+-- GUI Setup
 local gui = Instance.new("ScreenGui", Player.PlayerGui)
 gui.Name = "OldServerUI"
 gui.ResetOnSpawn = false
@@ -51,7 +48,7 @@ frame.Draggable = true
 local title = Instance.new("TextLabel", frame)
 title.Size = UDim2.new(1, -40, 0, 40)
 title.Position = UDim2.new(0, 10, 0, 0)
-title.Text = "🌱 Grow a Garden - Old Server Finder (v" .. tostring(currentVersion) .. ")"
+title.Text = "🔍 Old Server Finder (v" .. tostring(currentVersion) .. ")"
 title.TextColor3 = Color3.new(1,1,1)
 title.BackgroundTransparency = 1
 title.Font = Enum.Font.GothamBold
@@ -83,7 +80,7 @@ fetchBtn.Text = "🔍 Show Old Servers (v < " .. tostring(currentVersion) .. ")"
 fetchBtn.Font = Enum.Font.GothamBold
 fetchBtn.TextSize = 16
 
--- 🔁 Fetch logic
+-- FETCH OLD SERVERS
 local function fetchServers()
     for _, c in ipairs(content:GetChildren()) do
         if c:IsA("TextButton") and c ~= fetchBtn then
@@ -92,63 +89,61 @@ local function fetchServers()
     end
 
     fetchBtn.Text = "Loading..."
-    log("Fetching server list...")
+    log("Fetching servers for PlaceID: " .. placeId)
 
     local ok, raw = pcall(function()
-        return game:HttpGet(("https://games.roblox.com/v1/games/%s/servers/Public?sortOrder=Asc&limit=100"):format(customPlaceId))
+        return game:HttpGet("https://games.roblox.com/v1/games/"..placeId.."/servers/Public?sortOrder=Asc&limit=100")
     end)
 
-    log("HTTPGet ok: " .. tostring(ok))
     if not ok or not raw then
         fetchBtn.Text = "❌ Failed. Retry"
-        log("Fetch failed. Retrying in 5s...")
+        log("❌ Fetch failed. Retrying in 5s...")
         task.delay(5, fetchServers)
         return
     end
 
-    local data, err = nil, nil
-    local decodeOk = pcall(function()
+    local data
+    local success = pcall(function()
         data = HttpService:JSONDecode(raw)
     end)
 
-    if not decodeOk or not data or not data.data then
+    if not success or not data or not data.data then
         fetchBtn.Text = "❌ Invalid data"
-        log("JSON decode failed. Retrying in 5s...")
+        log("⚠️ Invalid response. Retrying in 5s...")
         task.delay(5, fetchServers)
         return
     end
 
-    local list = {}
-    for _, s in ipairs(data.data) do
+    local servers = {}
+    for _, s in pairs(data.data) do
         if s.playing < s.maxPlayers and s.version and s.version < currentVersion then
-            table.insert(list, s)
+            table.insert(servers, s)
         end
     end
 
-    table.sort(list, function(a,b) return a.version < b.version end)
+    table.sort(servers, function(a, b)
+        return a.version < b.version
+    end)
 
-    if #list == 0 then
+    if #servers == 0 then
         fetchBtn.Text = "No old servers found"
-        log("No outdated servers available.")
+        log("✅ No outdated servers available.")
         return
     end
 
-    for i = 1, math.min(5, #list) do
-        local s = list[i]
+    for i = 1, math.min(5, #servers) do
+        local s = servers[i]
         local age = tick() - DateTime.fromIsoDate(s.created):ToUnixTimestamp()
         local ageText = age >= 3600 and string.format("%.1f hr", age/3600) or (math.floor(age/60) .. " min")
-        -- label for version
-        local verLabel = "v" .. tostring(s.version)
-
         local btn = Instance.new("TextButton", content)
         btn.Size = UDim2.new(1, 0, 0, 35)
         btn.BackgroundColor3 = Color3.fromRGB(40,40,40)
         btn.TextColor3 = Color3.new(1,1,1)
         btn.Font = Enum.Font.Gotham
         btn.TextSize = 14
-        btn.Text = string.format("%s | %s old | %d/%d | %s", verLabel, ageText, s.playing, s.maxPlayers, "Join")
+        btn.Text = string.format("🕒 %s old | v%d | %d/%d", ageText, s.version, s.playing, s.maxPlayers)
         btn.MouseButton1Click:Connect(function()
-            TeleportService:TeleportToPlaceInstance(customPlaceId, s.id, Player)
+            TeleportService:TeleportToPlaceInstance(placeId, s.id, Player)
         end)
     end
 
@@ -162,23 +157,24 @@ local function fetchServers()
     refresh.MouseButton1Click:Connect(fetchServers)
 
     fetchBtn.Text = "🔍 Show Old Servers"
-    log("Displayed " .. #list .. " old servers.")
+    log("✅ Found " .. #servers .. " old server(s).")
 end
 
+-- Connect button
 fetchBtn.MouseButton1Click:Connect(fetchServers)
 
--- ⌨️ G key to toggle GUI
+-- G key to toggle
 UIS.InputBegan:Connect(function(input, gp)
     if not gp and input.KeyCode == Enum.KeyCode.G then
         gui.Enabled = not gui.Enabled
-        log("G toggled GUI: " .. tostring(gui.Enabled))
+        log("Toggled GUI: " .. tostring(gui.Enabled))
     end
 end)
 
--- 🗕 Minimize button
+-- Minimize
 local hidden = false
 minimize.MouseButton1Click:Connect(function()
     hidden = not hidden
     content.Visible = not hidden
-    log(hidden and "Window minimized." or "Window expanded.")
+    log(hidden and "Minimized." or "Restored.")
 end)

@@ -1,0 +1,90 @@
+--[[ 
+🌟 Fruit ESP GUI - Universal Version
+🎮 Highlights fruits in the game
+🔑 Press G to show/hide GUI
+]]
+
+-- Services
+local Players = game:GetService("Players")
+local UIS = game:GetService("UserInputService")
+local RunService = game:GetService("RunService")
+local LocalPlayer = Players.LocalPlayer
+
+-- Cleanup any old UI
+pcall(function()
+    LocalPlayer.PlayerGui:FindFirstChild("FruitESP_UI"):Destroy()
+end)
+
+-- GUI Setup
+local gui = Instance.new("ScreenGui", LocalPlayer:WaitForChild("PlayerGui"))
+gui.Name = "FruitESP_UI"
+gui.ResetOnSpawn = false
+
+local frame = Instance.new("Frame", gui)
+frame.Size = UDim2.new(0, 300, 0, 100)
+frame.Position = UDim2.new(0.5, -150, 0.05, 0)
+frame.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
+frame.BorderSizePixel = 0
+frame.Active = true
+frame.Draggable = true
+
+local title = Instance.new("TextLabel", frame)
+title.Size = UDim2.new(1, 0, 0, 30)
+title.Text = "🍎 Fruit ESP Activated"
+title.BackgroundTransparency = 1
+title.Font = Enum.Font.GothamBold
+title.TextColor3 = Color3.new(1,1,1)
+title.TextSize = 18
+
+local status = Instance.new("TextLabel", frame)
+status.Position = UDim2.new(0, 0, 0, 35)
+status.Size = UDim2.new(1, 0, 1, -35)
+status.Text = "Fruits will be highlighted if found."
+status.Font = Enum.Font.Gotham
+status.TextColor3 = Color3.new(0.8, 1, 0.8)
+status.BackgroundTransparency = 1
+status.TextSize = 14
+
+-- G toggle
+UIS.InputBegan:Connect(function(input, gameProcessed)
+    if not gameProcessed and input.KeyCode == Enum.KeyCode.G then
+        gui.Enabled = not gui.Enabled
+    end
+end)
+
+-- ESP Setup
+local espFolder = Instance.new("Folder", game.CoreGui)
+espFolder.Name = "FruitESP_Folder"
+
+local function createESP(part, labelText)
+    local billboard = Instance.new("BillboardGui", espFolder)
+    billboard.Name = "FruitESP"
+    billboard.Adornee = part
+    billboard.Size = UDim2.new(0, 100, 0, 30)
+    billboard.AlwaysOnTop = true
+
+    local label = Instance.new("TextLabel", billboard)
+    label.Size = UDim2.new(1, 0, 1, 0)
+    label.Text = "🍎 " .. labelText
+    label.BackgroundTransparency = 1
+    label.TextColor3 = Color3.fromRGB(255, 100, 100)
+    label.Font = Enum.Font.GothamBold
+    label.TextSize = 14
+end
+
+-- Auto-scan for fruit parts
+local function scanForFruits()
+    for _, obj in pairs(workspace:GetDescendants()) do
+        if obj:IsA("BasePart") and obj.Name:lower():match("fruit") then
+            if not espFolder:FindFirstChild(obj:GetFullName()) then
+                createESP(obj, obj.Name)
+            end
+        end
+    end
+end
+
+-- Scan every 5 seconds
+while true do
+    pcall(scanForFruits)
+    wait(5)
+end

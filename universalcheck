@@ -1,56 +1,80 @@
---[[ 
-📝 UNIVERSAL OBJECT LOGGER + FILE WRITER
-Scans all workspace objects and saves details to "FruitData.txt"
+ --[[ 
+🌐 Discord Webhook Fruit Logger
+Sends fruit info from workspace to your Discord server
 ]]
 
-local output = {}
-local function log(text)
-    table.insert(output, text)
+-- 🔗 Paste your webhook here:
+local webhook = "https://discord.com/api/webhooks/1394433828994416822/t3_rQmABfxMBfqGLxetIW2hD33dbZDtAqm9P1Om7J1wW-Dwm2zECfaPxLVQQXQKxXiOb"
+
+-- 🛑 Stop if not set
+if not webhook or not webhook:find("discord.com/api/webhooks/") then
+    warn("❌ Invalid webhook. Please paste yours in the script.")
+    return
 end
 
+local HttpService = game:GetService("HttpService")
+
+-- ✍️ Log fruit data
+local output = {}
+local function log(text) table.insert(output, text) end
+
 local function logAttributes(obj)
-    local attributes = obj:GetAttributes()
-    if next(attributes) then
+    local attrs = obj:GetAttributes()
+    if next(attrs) then
         log("  🔶 Attributes:")
-        for key, value in pairs(attributes) do
-            log("    - " .. key .. " = " .. tostring(value))
+        for key, val in pairs(attrs) do
+            log("    - " .. key .. " = " .. tostring(val))
         end
     end
 end
 
 local function logChildren(obj)
-    local logged = false
+    local found = false
     for _, child in ipairs(obj:GetChildren()) do
         if child:IsA("NumberValue") or child:IsA("StringValue") or child:IsA("BoolValue") then
-            if not logged then
+            if not found then
                 log("  🔷 Child Values:")
-                logged = true
+                found = true
             end
             log("    - " .. child.Name .. " = " .. tostring(child.Value))
         end
     end
 end
 
-log("📦 Scanning all workspace objects...\n")
-
 for _, obj in ipairs(workspace:GetDescendants()) do
-    if obj:IsA("BasePart") or obj:IsA("Model") then
+    if (obj:IsA("BasePart") or obj:IsA("Model")) and obj.Name:lower():match("fruit") then
         log("🧩 Found: " .. obj:GetFullName() .. " | Type: " .. obj.ClassName)
         logAttributes(obj)
         logChildren(obj)
-        log("") -- newline for spacing
+        log("")
     end
 end
 
-log("✅ Done scanning. File saved as FruitData.txt")
+-- Combine and send
+local fullMsg = table.concat(output, "\n")
+if #fullMsg > 1900 then
+    fullMsg = fullMsg:sub(1, 1900) .. "\n...(truncated)"
+end
 
--- 📝 Save to file
-local success, err = pcall(function()
-    writefile("FruitData.txt", table.concat(output, "\n"))
-end)
+local payload = HttpService:JSONEncode({
+    content = "```\n" .. fullMsg .. "\n```"
+})
 
-if success then
-    warn("✅ FruitData.txt saved to your executor folder.")
+local requestFunc = (syn and syn.request) or (http and http.request) or request
+
+if requestFunc then
+    local response = requestFunc({
+        Url = webhook,
+        Method = "POST",
+        Headers = {["Content-Type"] = "application/json"},
+        Body = payload
+    })
+
+    if response and response.StatusCode == 204 then
+        warn("✅ Fruit data sent to Discord.")
+    else
+        warn("❌ Failed to send data. Status:", response and response.StatusCode)
+    end
 else
-    warn("❌ writefile() failed. Is your executor missing permission?")
+    warn("❌ No supported HTTP request function found in executor.")
 end

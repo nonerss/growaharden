@@ -1,27 +1,25 @@
 --[[ 
-🍎 Fruit ESP (with Name, Weight, Price)
-🎮 ESP toggle via button in GUI
-🔑 Press G to show/hide GUI
+Grow a Garden - Fruit ESP
+Displays fruit name, weight, and variant above each fruit in all plots
 ]]
 
--- Services
 local Players = game:GetService("Players")
 local UIS = game:GetService("UserInputService")
 local RunService = game:GetService("RunService")
 local LocalPlayer = Players.LocalPlayer
 
--- Cleanup previous
+-- Cleanup
 pcall(function() LocalPlayer.PlayerGui:FindFirstChild("FruitESP_UI"):Destroy() end)
-pcall(function() game.CoreGui:FindFirstChild("FruitESP_Folder"):Destroy() end)
+pcall(function() game.CoreGui:FindFirstChild("FruitESP_Objects"):Destroy() end)
 
--- GUI Setup
+-- GUI
 local gui = Instance.new("ScreenGui", LocalPlayer:WaitForChild("PlayerGui"))
 gui.Name = "FruitESP_UI"
 gui.ResetOnSpawn = false
 
 local frame = Instance.new("Frame", gui)
-frame.Size = UDim2.new(0, 300, 0, 130)
-frame.Position = UDim2.new(0.5, -150, 0.05, 0)
+frame.Size = UDim2.new(0, 250, 0, 110)
+frame.Position = UDim2.new(0.5, -125, 0.05, 0)
 frame.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
 frame.BorderSizePixel = 0
 frame.Active = true
@@ -29,78 +27,64 @@ frame.Draggable = true
 
 local title = Instance.new("TextLabel", frame)
 title.Size = UDim2.new(1, 0, 0, 30)
-title.Text = "🍎 Fruit ESP GUI"
+title.Text = "🍎 Fruit ESP"
 title.BackgroundTransparency = 1
 title.Font = Enum.Font.GothamBold
-title.TextColor3 = Color3.new(1,1,1)
+title.TextColor3 = Color3.new(1, 1, 1)
 title.TextSize = 18
 
 local status = Instance.new("TextLabel", frame)
 status.Position = UDim2.new(0, 0, 0, 35)
-status.Size = UDim2.new(1, 0, 0, 40)
-status.Text = "ESP is currently: 🔴 OFF"
+status.Size = UDim2.new(1, 0, 0, 30)
+status.Text = "ESP: 🔴 OFF"
 status.Font = Enum.Font.Gotham
-status.TextColor3 = Color3.fromRGB(255, 150, 150)
+status.TextColor3 = Color3.fromRGB(255, 100, 100)
 status.BackgroundTransparency = 1
 status.TextSize = 14
-status.TextWrapped = true
 
 local toggleBtn = Instance.new("TextButton", frame)
-toggleBtn.Size = UDim2.new(1, -20, 0, 40)
-toggleBtn.Position = UDim2.new(0, 10, 1, -45)
-toggleBtn.BackgroundColor3 = Color3.fromRGB(50,150,50)
-toggleBtn.TextColor3 = Color3.new(1,1,1)
+toggleBtn.Position = UDim2.new(0.1, 0, 0, 70)
+toggleBtn.Size = UDim2.new(0.8, 0, 0, 30)
+toggleBtn.Text = "✅ Enable ESP"
+toggleBtn.BackgroundColor3 = Color3.fromRGB(50, 150, 50)
+toggleBtn.TextColor3 = Color3.new(1, 1, 1)
 toggleBtn.Font = Enum.Font.GothamBold
 toggleBtn.TextSize = 16
-toggleBtn.Text = "✅ Enable Fruit ESP"
 
--- Toggle GUI with G
-UIS.InputBegan:Connect(function(input, gameProcessed)
-    if not gameProcessed and input.KeyCode == Enum.KeyCode.G then
+-- ESP toggle logic
+local ESP_ON = false
+local espFolder = Instance.new("Folder", game.CoreGui)
+espFolder.Name = "FruitESP_Objects"
+
+-- Hide GUI with G
+UIS.InputBegan:Connect(function(input, gp)
+    if not gp and input.KeyCode == Enum.KeyCode.G then
         gui.Enabled = not gui.Enabled
     end
 end)
 
--- ESP Folder
-local espFolder = Instance.new("Folder", game.CoreGui)
-espFolder.Name = "FruitESP_Folder"
-
--- ESP Helpers
-local function getAttributeOrChildValue(obj, key)
-    if obj:GetAttribute(key) then return obj:GetAttribute(key) end
-    local child = obj:FindFirstChild(key)
-    if child and (child:IsA("NumberValue") or child:IsA("StringValue")) then
-        return child.Value
-    end
-    return nil
-end
-
-local function createESP(part)
-    local id = "FruitESP_" .. part:GetDebugId()
+-- Helpers
+local function createESP(part, name, weight, variant)
+    local id = "ESP_" .. part:GetDebugId()
     if espFolder:FindFirstChild(id) then return end
 
-    local name = part.Name
-    local weight = getAttributeOrChildValue(part, "Weight") or "?"
-    local price = getAttributeOrChildValue(part, "Price") or "?"
+    local gui = Instance.new("BillboardGui")
+    gui.Name = id
+    gui.Adornee = part
+    gui.AlwaysOnTop = true
+    gui.Size = UDim2.new(0, 200, 0, 50)
+    gui.Parent = espFolder
 
-    local billboard = Instance.new("BillboardGui", espFolder)
-    billboard.Name = id
-    billboard.Adornee = part
-    billboard.Size = UDim2.new(0, 150, 0, 60)
-    billboard.AlwaysOnTop = true
-
-    local label = Instance.new("TextLabel", billboard)
+    local label = Instance.new("TextLabel", gui)
     label.Size = UDim2.new(1, 0, 1, 0)
     label.BackgroundTransparency = 1
-    label.TextColor3 = Color3.fromRGB(255, 255, 100)
+    label.TextColor3 = Color3.new(1, 1, 0.7)
+    label.TextStrokeTransparency = 0.5
     label.Font = Enum.Font.Gotham
     label.TextSize = 14
     label.TextWrapped = true
-    label.Text = string.format("🍎 %s\n⚖️ Weight: %s\n💰 Price: %s", name, tostring(weight), tostring(price))
+    label.Text = string.format("🍓 %s\n⚖️ %s kg\n🧬 Variant: %s", name, weight, variant or "?")
 end
-
--- ESP Toggle Logic
-local espEnabled = false
 
 local function clearESP()
     for _, v in pairs(espFolder:GetChildren()) do
@@ -108,39 +92,71 @@ local function clearESP()
     end
 end
 
-local function scanForFruits()
-    if not espEnabled then return end
-    for _, obj in pairs(workspace:GetDescendants()) do
-        if obj:IsA("BasePart") and obj.Name:lower():match("fruit") then
-            createESP(obj)
+local function scanFruits()
+    if not ESP_ON then return end
+    clearESP()
+
+    local farmFolder = workspace:FindFirstChild("Farm")
+    if not farmFolder then return end
+
+    for _, farm in ipairs(farmFolder:GetChildren()) do
+        -- A. Fruits in Plants_Physical
+        local pp = farm:FindFirstChild("Plants_Physical")
+        if pp then
+            for _, fruit in ipairs(pp:GetChildren()) do
+                if fruit:IsA("BasePart") or fruit:IsA("Model") then
+                    local name = fruit:GetAttribute("f") or fruit.Name
+                    local weight = fruit:GetAttribute("WeightMulti") or "?"
+                    local variant = fruit:GetAttribute("c") or "?"
+                    createESP(fruit, name, tostring(weight), tostring(variant))
+                end
+            end
+        end
+
+        -- B. Fruits in Important > Plants_Physical > Fruits
+        local important = farm:FindFirstChild("Important")
+        if important and important:FindFirstChild("Plants_Physical") then
+            for _, plant in ipairs(important.Plants_Physical:GetChildren()) do
+                local fruitsFolder = plant:FindFirstChild("Fruits")
+                if fruitsFolder then
+                    for _, fruit in ipairs(fruitsFolder:GetChildren()) do
+                        if fruit:IsA("BasePart") or fruit:IsA("Model") then
+                            local name = fruit:GetAttribute("f") or fruit.Name
+                            local weight = fruit:GetAttribute("WeightMulti") or "?"
+                            local variant = fruit:GetAttribute("c") or "?"
+                            createESP(fruit, name, tostring(weight), tostring(variant))
+                        end
+                    end
+                end
+            end
         end
     end
 end
 
--- Toggle Button
-toggleBtn.MouseButton1Click:Connect(function()
-    espEnabled = not espEnabled
-    if espEnabled then
-        toggleBtn.Text = "❌ Disable Fruit ESP"
-        toggleBtn.BackgroundColor3 = Color3.fromRGB(200, 50, 50)
-        status.Text = "ESP is currently: 🟢 ON"
-        status.TextColor3 = Color3.fromRGB(150, 255, 150)
-        scanForFruits()
-    else
-        toggleBtn.Text = "✅ Enable Fruit ESP"
-        toggleBtn.BackgroundColor3 = Color3.fromRGB(50, 150, 50)
-        status.Text = "ESP is currently: 🔴 OFF"
-        status.TextColor3 = Color3.fromRGB(255, 150, 150)
-        clearESP()
+-- Auto-refresh ESP every few seconds
+task.spawn(function()
+    while true do
+        if ESP_ON then
+            pcall(scanFruits)
+        end
+        task.wait(5)
     end
 end)
 
--- Loop ESP scan every 5 seconds
-task.spawn(function()
-    while true do
-        if espEnabled then
-            pcall(scanForFruits)
-        end
-        task.wait(5)
+-- Toggle Button
+toggleBtn.MouseButton1Click:Connect(function()
+    ESP_ON = not ESP_ON
+    if ESP_ON then
+        toggleBtn.Text = "❌ Disable ESP"
+        toggleBtn.BackgroundColor3 = Color3.fromRGB(200, 50, 50)
+        status.Text = "ESP: 🟢 ON"
+        status.TextColor3 = Color3.fromRGB(150, 255, 150)
+        scanFruits()
+    else
+        toggleBtn.Text = "✅ Enable ESP"
+        toggleBtn.BackgroundColor3 = Color3.fromRGB(50, 150, 50)
+        status.Text = "ESP: 🔴 OFF"
+        status.TextColor3 = Color3.fromRGB(255, 100, 100)
+        clearESP()
     end
 end)
